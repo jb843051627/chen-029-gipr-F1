@@ -56,6 +56,37 @@ public class TGiprCaseFlow implements Serializable {
     @ApiModelProperty(value = "最近一次挪关动作")
     private String lastAction;
 
+    /** 哪一家企业（授权册上的代号） */
+    @TableField("holder_no")
+    @ApiModelProperty(value = "哪一家企业（授权册上的代号）")
+    private String holderNo;
+
+    /** 挂哪一个名录产品 */
+    @TableField("prod_no")
+    @ApiModelProperty(value = "挂哪一个名录产品")
+    private String prodNo;
+
+    /** 拟贴在哪一类货上 */
+    @TableField("goods_kind")
+    @ApiModelProperty(value = "拟贴在哪一类货上")
+    private String goodsKind;
+
+    /** 递件那一刻 */
+    @TableField("submit_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "递件那一刻")
+    private Date submitTime;
+
+    /** 标志核发记号 0未核发 1已核发（两名核签岗签齐后写回本行） */
+    @TableField("cert_flag")
+    @ApiModelProperty(value = "标志核发记号 0未核发 1已核发")
+    private Integer certFlag;
+
+    /** 了结方式 0未了结 1递件方撤回 2挂靠名录产品整段并走 */
+    @TableField("end_kind")
+    @ApiModelProperty(value = "了结方式 0未了结 1递件方撤回 2名录产品整段并走")
+    private Integer endKind;
+
     /** 删除标记 0正常 1删除 */
     @TableField("del_flag")
     @ApiModelProperty(value = "删除标记 0正常 1删除")
@@ -134,6 +165,54 @@ public class TGiprCaseFlow implements Serializable {
 
     public void setLastAction(String lastAction) {
         this.lastAction = lastAction;
+    }
+
+    public String getHolderNo() {
+        return holderNo;
+    }
+
+    public void setHolderNo(String holderNo) {
+        this.holderNo = holderNo;
+    }
+
+    public String getProdNo() {
+        return prodNo;
+    }
+
+    public void setProdNo(String prodNo) {
+        this.prodNo = prodNo;
+    }
+
+    public String getGoodsKind() {
+        return goodsKind;
+    }
+
+    public void setGoodsKind(String goodsKind) {
+        this.goodsKind = goodsKind;
+    }
+
+    public Date getSubmitTime() {
+        return submitTime;
+    }
+
+    public void setSubmitTime(Date submitTime) {
+        this.submitTime = submitTime;
+    }
+
+    public Integer getCertFlag() {
+        return certFlag;
+    }
+
+    public void setCertFlag(Integer certFlag) {
+        this.certFlag = certFlag;
+    }
+
+    public Integer getEndKind() {
+        return endKind;
+    }
+
+    public void setEndKind(Integer endKind) {
+        this.endKind = endKind;
     }
 
     public Integer getDelFlag() {

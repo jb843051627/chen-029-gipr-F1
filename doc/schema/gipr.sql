@@ -23,10 +23,16 @@ CREATE TABLE IF NOT EXISTS t_gipr_archive_row (
 CREATE TABLE IF NOT EXISTS t_gipr_case_flow (
   id bigint NOT NULL COMMENT '主键',
   biz_no varchar(64) DEFAULT NULL COMMENT '专用标志使用核准办件的件次',
-  stage int DEFAULT NULL COMMENT '当前关次 0..3（申请受理/材料初审/标志核准/备案发标）',
+  stage int DEFAULT NULL COMMENT '当前关次 0..3（申请受理/材料初审/标志核准/备案发标）；以追溯串数出来的为准，本列只是落库时的对齐副本',
   status int DEFAULT NULL COMMENT '单子走到哪一关 0未起 1在办 2已封住',
-  content varchar(255) DEFAULT NULL COMMENT '一关一记',
+  content varchar(255) DEFAULT NULL COMMENT '一关一记（同一格只认最早那句按语，后写的顶不掉）',
   last_action varchar(64) DEFAULT NULL COMMENT '最近一次挪关动作',
+  holder_no varchar(64) DEFAULT NULL COMMENT '哪一家企业（授权册上的代号）',
+  prod_no varchar(64) DEFAULT NULL COMMENT '挂哪一个名录产品',
+  goods_kind varchar(32) DEFAULT NULL COMMENT '拟贴在哪一类货上',
+  submit_time datetime DEFAULT NULL COMMENT '递件那一刻',
+  cert_flag int DEFAULT '0' COMMENT '标志核发记号 0未核发 1已核发（两名核签岗签齐后写回本行）',
+  end_kind int DEFAULT '0' COMMENT '了结方式 0未了结 1递件方撤回 2挂靠名录产品整段并走',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
   create_time datetime DEFAULT NULL COMMENT '创建时间',
@@ -35,6 +41,22 @@ CREATE TABLE IF NOT EXISTS t_gipr_case_flow (
   remark varchar(500) DEFAULT NULL COMMENT '备注',
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='专用标志使用核准办件流转单';
+
+CREATE TABLE IF NOT EXISTS t_gipr_case_trace (
+  id bigint NOT NULL COMMENT '主键',
+  biz_no varchar(64) DEFAULT NULL COMMENT '挂在哪一件身后（件次）',
+  stage int DEFAULT NULL COMMENT '落话时件站在哪一格 0..3',
+  attempt int DEFAULT NULL COMMENT '这一格第几次进入（退回去再走回按新起的一次重新累计）',
+  action varchar(16) DEFAULT NULL COMMENT '落话动作 CREATE/ANNOTATE/ADVANCE/ROLLBACK/SIGN/CLOSE/TERMINATE',
+  content varchar(255) DEFAULT NULL COMMENT '那一格留下的按语（回退时原样挪到串末尾；核签岗记签名）',
+  happened_at datetime DEFAULT NULL COMMENT '这句按语落在哪一刻',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  KEY idx_gipr_case_trace_biz (biz_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='专用标志使用核准办件按语追溯串';
 
 CREATE TABLE IF NOT EXISTS t_gipr_cert_bill (
   id bigint NOT NULL COMMENT '主键',
