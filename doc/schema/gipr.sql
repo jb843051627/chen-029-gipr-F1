@@ -23,7 +23,17 @@ CREATE TABLE IF NOT EXISTS t_gipr_archive_row (
 CREATE TABLE IF NOT EXISTS t_gipr_case_flow (
   id bigint NOT NULL COMMENT '主键',
   biz_no varchar(64) DEFAULT NULL COMMENT '专用标志使用核准办件的件次',
-  stage int DEFAULT NULL COMMENT '当前关次 0..3（申请受理/材料初审/标志核准/备案发标）',
+  holder_no varchar(64) DEFAULT NULL COMMENT '起件四样之一：哪一家企业（授权册上那一个代号）',
+  prod_id int DEFAULT NULL COMMENT '起件四样之二：挂哪一个名录产品（名录底册id）',
+  goods_kind varchar(128) DEFAULT NULL COMMENT '起件四样之三：拟贴在哪一类货上',
+  apply_time datetime DEFAULT NULL COMMENT '起件四样之四：递件那一刻',
+  idem_key varchar(96) DEFAULT NULL COMMENT '同一件并着进两回的幂等键（重取不重建）',
+  stage int DEFAULT NULL COMMENT '当前关次 0..3（申请受理/材料初审/标志核准/备案发标）——以后端数出来的为准',
+  view_seq int DEFAULT NULL COMMENT '报面自带序号（只供人眼对着看，库里存取一律按 stage 数出来的）',
+  attempt_no int DEFAULT '0' COMMENT '进关累计趟次：退回再进按新起一次重新累计',
+  cert_flag int DEFAULT '0' COMMENT '标志核发记号 0未写回 1已写回（末关两名核签齐了写回本行）',
+  end_kind int DEFAULT '0' COMMENT '了结类别 0未完 1走满末格封口 2递件方撤回 3名录产品整段并走',
+  open_holder varchar(64) DEFAULT NULL COMMENT '在办占位：未闭上=企业代号（同企业在办至多一条的硬约束），闭上/了结/抽走=NULL',
   status int DEFAULT NULL COMMENT '单子走到哪一关 0未起 1在办 2已封住',
   content varchar(255) DEFAULT NULL COMMENT '一关一记',
   last_action varchar(64) DEFAULT NULL COMMENT '最近一次挪关动作',
@@ -33,8 +43,44 @@ CREATE TABLE IF NOT EXISTS t_gipr_case_flow (
   update_by varchar(64) DEFAULT NULL COMMENT '更新者',
   update_time datetime DEFAULT NULL COMMENT '更新时间',
   remark varchar(500) DEFAULT NULL COMMENT '备注',
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_case_idem (idem_key),
+  UNIQUE KEY uk_case_open_holder (open_holder),
+  KEY idx_case_holder_status (holder_no, status, del_flag)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='专用标志使用核准办件流转单';
+
+CREATE TABLE IF NOT EXISTS t_gipr_case_trace (
+  id bigint NOT NULL COMMENT '主键',
+  case_id bigint NOT NULL COMMENT '挂在哪一条件身后',
+  stage int DEFAULT NULL COMMENT '这句话落在哪一格 0..3',
+  attempt_no int DEFAULT '0' COMMENT '落字时本件的进关趟次（同格重进后旧句仍在、新句另计）',
+  action_kind varchar(32) DEFAULT NULL COMMENT '动作类别 START起件/NOTE按语/ADVANCE推进/ROLLBACK退回/SIGN核签/ISSUE核发/CLOSE封口/CANCEL撤回/MERGE并走',
+  content varchar(500) DEFAULT NULL COMMENT '那句按语原样（退回时原样挪入末尾）',
+  trace_time datetime DEFAULT NULL COMMENT '这句话落下的那一刻',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  KEY idx_trace_case_time (case_id, trace_time, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='办件按语追溯串（只追加，回放只读不回写）';
+
+CREATE TABLE IF NOT EXISTS t_gipr_case_sign (
+  id bigint NOT NULL COMMENT '主键',
+  case_id bigint NOT NULL COMMENT '挂在哪一条件（末关核签）',
+  signer_no varchar(64) NOT NULL COMMENT '核签岗代号（两名须各落一笔，同人不算两名）',
+  sign_time datetime DEFAULT NULL COMMENT '落笔那一刻',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_sign_case_signer (case_id, signer_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='备案发标前两名核签岗落笔记录';
 
 CREATE TABLE IF NOT EXISTS t_gipr_cert_bill (
   id bigint NOT NULL COMMENT '主键',
@@ -163,4 +209,79 @@ CREATE TABLE IF NOT EXISTS t_gipr_yield_rule (
 INSERT IGNORE INTO t_gipr_product_book (id, prod_no, prod_name, prod_kind, road_name, src_kind, status, del_flag, create_by, create_time)
 VALUES (0, 'GP00', '澜原省渠州市浚安县浚浦蟹（甲层水产类·在册）', '甲层', '澜原省—渠州市—浚安县—北浚镇—浚浦水域', '国家局核准公告下发', 0, 0, 'seed', NOW()),
        (1, 'GP01', '南浚镇西片沙梨·已移出的旧名录（已移出）', '乙层', '澜原省—渠州市—浚安县—南浚镇—西片坡地', '省里增补', 1, 0, 'seed', NOW());
+
+-- ---------------------------------------------------------------------------
+-- 旧库升级段：早年立下的库只有 t_gipr_case_flow 老五列，以下逐列补齐；
+-- 新库 CREATE TABLE 已含同名列，存储过程按 information_schema 判过，重复执行不报错。
+-- 早年那批件与今年新起的件读法一致，不因立的迟早分岔。
+-- ---------------------------------------------------------------------------
+DROP PROCEDURE IF EXISTS gipr_case_flow_upgrade;
+DELIMITER $$
+CREATE PROCEDURE gipr_case_flow_upgrade()
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'holder_no') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN holder_no varchar(64) DEFAULT NULL COMMENT '起件四样之一：哪一家企业（授权册代号）' AFTER biz_no;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'prod_id') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN prod_id int DEFAULT NULL COMMENT '起件四样之二：挂哪一个名录产品' AFTER holder_no;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'goods_kind') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN goods_kind varchar(128) DEFAULT NULL COMMENT '起件四样之三：拟贴在哪一类货上' AFTER prod_id;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'apply_time') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN apply_time datetime DEFAULT NULL COMMENT '起件四样之四：递件那一刻' AFTER goods_kind;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'idem_key') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN idem_key varchar(96) DEFAULT NULL COMMENT '同一件并着进两回的幂等键' AFTER apply_time;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'view_seq') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN view_seq int DEFAULT NULL COMMENT '报面自带序号（只供人眼看）' AFTER stage;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'attempt_no') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN attempt_no int DEFAULT 0 COMMENT '进关累计趟次' AFTER view_seq;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'cert_flag') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN cert_flag int DEFAULT 0 COMMENT '标志核发记号 0未写回 1已写回' AFTER attempt_no;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'end_kind') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN end_kind int DEFAULT 0 COMMENT '了结类别 0未完 1封口 2撤回 3并走' AFTER cert_flag;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND column_name = 'open_holder') THEN
+    ALTER TABLE t_gipr_case_flow ADD COLUMN open_holder varchar(64) DEFAULT NULL COMMENT '在办占位（闭上/了结置NULL）' AFTER end_kind;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.statistics
+                 WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND index_name = 'uk_case_open_holder') THEN
+    ALTER TABLE t_gipr_case_flow ADD UNIQUE KEY uk_case_open_holder (open_holder);
+  END IF;
+  -- 早年那批件：未闭上的把占位补上；同企业若已有多条在办（旧伤），只占位最早一条，
+  -- 其余留 NULL，交由业务逐件了结，不把迁移卡死。
+  UPDATE t_gipr_case_flow c
+    JOIN (SELECT holder_no, MIN(id) AS min_id FROM t_gipr_case_flow
+           WHERE holder_no IS NOT NULL AND del_flag = 0
+             AND COALESCE(status, 1) = 1 AND COALESCE(end_kind, 0) = 0
+           GROUP BY holder_no) m ON m.min_id = c.id
+     SET c.open_holder = c.holder_no
+   WHERE c.open_holder IS NULL;
+  IF NOT EXISTS (SELECT 1 FROM (
+                   SELECT open_holder FROM t_gipr_case_flow
+                    WHERE open_holder IS NOT NULL GROUP BY open_holder HAVING COUNT(*) > 1) d) THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.statistics
+                   WHERE table_schema = DATABASE() AND table_name = 't_gipr_case_flow' AND index_name = 'uk_case_open_holder') THEN
+      ALTER TABLE t_gipr_case_flow ADD UNIQUE KEY uk_case_open_holder (open_holder);
+    END IF;
+  END IF;
+END$$
+DELIMITER ;
+CALL gipr_case_flow_upgrade();
+DROP PROCEDURE IF EXISTS gipr_case_flow_upgrade;
 

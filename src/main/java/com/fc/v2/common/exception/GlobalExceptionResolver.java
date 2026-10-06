@@ -101,6 +101,16 @@ public class GlobalExceptionResolver{
     }
     
     /**
+     * 办件流转规矩被顶住：消息点名了缺哪一样、断在哪一格，原样回，不许含糊。
+     */
+    @ExceptionHandler(FlowRuleException.class)
+    public AjaxResult flowRuleException(FlowRuleException e)
+    {
+        logger.warn("办件流转规矩拦截: {}", e.getMessage());
+        return AjaxResult.error(e.getMessage());
+    }
+
+    /**
      * 演示模式异常
      */
     @ExceptionHandler(DemoModeException.class)

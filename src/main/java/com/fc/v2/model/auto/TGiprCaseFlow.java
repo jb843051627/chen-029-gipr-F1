@@ -36,10 +36,61 @@ public class TGiprCaseFlow implements Serializable {
     @ApiModelProperty(value = "专用标志使用核准办件的件次")
     private String bizNo;
 
-    /** 当前关次 0..3（申请受理/材料初审/标志核准/备案发标） */
+    /** 起件四样之一：哪一家企业（授权册上那一个代号） */
+    @TableField("holder_no")
+    @ApiModelProperty(value = "哪一家企业（授权册代号）")
+    private String holderNo;
+
+    /** 起件四样之二：挂哪一个名录产品 */
+    @TableField("prod_id")
+    @ApiModelProperty(value = "挂哪一个名录产品")
+    private Integer prodId;
+
+    /** 起件四样之三：拟贴在哪一类货上 */
+    @TableField("goods_kind")
+    @ApiModelProperty(value = "拟贴在哪一类货上")
+    private String goodsKind;
+
+    /** 起件四样之四：递件那一刻 */
+    @TableField("apply_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "递件那一刻")
+    private Date applyTime;
+
+    /** 同一件并着进两回的幂等键（重取不重建） */
+    @TableField("idem_key")
+    @ApiModelProperty(value = "幂等键")
+    private String idemKey;
+
+    /** 当前关次 0..3（申请受理/材料初审/标志核准/备案发标）——以后端数出来的为准 */
     @TableField("stage")
     @ApiModelProperty(value = "当前关次 0..3（申请受理/材料初审/标志核准/备案发标）")
     private Integer stage;
+
+    /** 报面自带序号（只供人眼对着看，库里存取一律按 stage 数出来的） */
+    @TableField("view_seq")
+    @ApiModelProperty(value = "报面自带序号，仅供人眼对照")
+    private Integer viewSeq;
+
+    /** 进关累计趟次：退回再进按新起一次重新累计 */
+    @TableField("attempt_no")
+    @ApiModelProperty(value = "进关累计趟次")
+    private Integer attemptNo;
+
+    /** 标志核发记号 0未写回 1已写回（末关两名核签齐了写回本行） */
+    @TableField("cert_flag")
+    @ApiModelProperty(value = "标志核发记号 0未写回 1已写回")
+    private Integer certFlag;
+
+    /** 了结类别 0未完 1走满末格封口 2递件方撤回 3名录产品整段并走 */
+    @TableField("end_kind")
+    @ApiModelProperty(value = "了结类别 0未完 1封口 2撤回 3并走")
+    private Integer endKind;
+
+    /** 在办占位：未闭上=企业代号（同企业在办至多一条的硬约束），闭上/了结/抽走=NULL */
+    @TableField("open_holder")
+    @ApiModelProperty(value = "在办占位，闭上/了结置空")
+    private String openHolder;
 
     /** 单子走到哪一关 0未起 1在办 2已封住 */
     @TableField("status")
@@ -102,6 +153,86 @@ public class TGiprCaseFlow implements Serializable {
 
     public void setBizNo(String bizNo) {
         this.bizNo = bizNo;
+    }
+
+    public String getHolderNo() {
+        return holderNo;
+    }
+
+    public void setHolderNo(String holderNo) {
+        this.holderNo = holderNo;
+    }
+
+    public Integer getProdId() {
+        return prodId;
+    }
+
+    public void setProdId(Integer prodId) {
+        this.prodId = prodId;
+    }
+
+    public String getGoodsKind() {
+        return goodsKind;
+    }
+
+    public void setGoodsKind(String goodsKind) {
+        this.goodsKind = goodsKind;
+    }
+
+    public Date getApplyTime() {
+        return applyTime;
+    }
+
+    public void setApplyTime(Date applyTime) {
+        this.applyTime = applyTime;
+    }
+
+    public String getIdemKey() {
+        return idemKey;
+    }
+
+    public void setIdemKey(String idemKey) {
+        this.idemKey = idemKey;
+    }
+
+    public Integer getViewSeq() {
+        return viewSeq;
+    }
+
+    public void setViewSeq(Integer viewSeq) {
+        this.viewSeq = viewSeq;
+    }
+
+    public Integer getAttemptNo() {
+        return attemptNo;
+    }
+
+    public void setAttemptNo(Integer attemptNo) {
+        this.attemptNo = attemptNo;
+    }
+
+    public Integer getCertFlag() {
+        return certFlag;
+    }
+
+    public void setCertFlag(Integer certFlag) {
+        this.certFlag = certFlag;
+    }
+
+    public Integer getEndKind() {
+        return endKind;
+    }
+
+    public void setEndKind(Integer endKind) {
+        this.endKind = endKind;
+    }
+
+    public String getOpenHolder() {
+        return openHolder;
+    }
+
+    public void setOpenHolder(String openHolder) {
+        this.openHolder = openHolder;
     }
 
     public Integer getStage() {
